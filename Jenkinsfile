@@ -13,6 +13,8 @@ pipeline {
                     python3 -m venv venv
                     . venv/bin/activate
                     pip install -r requirements.txt
+                    
+                    export PYTHONPATH=$PYTHONPATH:.
                     pytest tests/ -v
                 '''
             }
@@ -21,7 +23,7 @@ pipeline {
             steps {
                 sh '''
                     docker build -t $DOCKER_IMAGE .
-                    docker run --rm $DOCKER_IMAGE pytest tests/ -v
+                    docker run --rm -e PYTHONPATH=. $DOCKER_IMAGE pytest tests/ -v
                 '''
             }
         }
