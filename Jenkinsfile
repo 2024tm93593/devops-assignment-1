@@ -21,7 +21,7 @@ pipeline {
             steps {
                 sh '''
                     docker build -t $DOCKER_IMAGE .
-                    docker run --rm $DOCKER_IMAGE pytest
+                    docker run --rm $DOCKER_IMAGE pytest tests/ -v
                 '''
             }
         }
