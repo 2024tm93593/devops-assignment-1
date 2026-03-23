@@ -13,12 +13,12 @@ pipeline {
                     sh '''
                         if ! command -v docker &> /dev/null; then
                             echo "Docker not found, installing..."
-                            sudo apt-get update && sudo apt-get install -y docker.io
+                            apt-get update &&  apt-get install -y docker.io
                         fi
                         
                         if ! command -v python3 &> /dev/null; then
                             echo "Python not found, installing..."
-                            sudo apt-get update && sudo apt-get install -y python3 python3-pip python3-venv
+                            apt-get update &&  apt-get install -y python3 python3-pip python3-venv
                         fi
                     '''
                 }
