@@ -27,30 +27,22 @@ A comprehensive Flask-based gym management web service. This repository demonstr
 
 ## Overview
 
-ACEest Fitness (Version 2.2.1) is a functional fitness gym management system. Building on v2.1.2, this release introduces weekly progress chart generation using matplotlib.
+ACEest Fitness (Version 3.0.1) is a functional fitness gym management system. Building on previous versions, this release introduces comprehensive workout logging, body metrics tracking, and a BMI calculator.
 
 **Available Programs:**
 
-- **Fat Loss (FL):** Focused on weight reduction with a calorie factor of 22 kcal/kg.
-- **Muscle Gain (MG):** Hypertrophy and strength-focused routines with a calorie factor of 35 kcal/kg.
-- **Beginner (BG):** Circuit training and technique mastery with a calorie factor of 26 kcal/kg.
+- **Fat Loss (FL) – 3 day:** 3-day full-body fat loss with a calorie factor of 22 kcal/kg.
+- **Fat Loss (FL) – 5 day:** 5-day split, higher volume fat loss with a calorie factor of 24 kcal/kg.
+- **Muscle Gain (MG) – PPL:** Push/Pull/Legs hypertrophy with a calorie factor of 35 kcal/kg.
+- **Beginner (BG):** 3-day simple beginner full-body with a calorie factor of 26 kcal/kg.
 
-**New in v2.2.1:**
+**New in v3.0.1:**
 
-- Support for generating and visualizing weekly adherence progress charts via a new API endpoint `/progress/chart/<name>`.
-- Integrated `matplotlib` as a core dependency for dynamic chart generation.
-
-**New in v2.1.2:**
-
-- Descriptive program keys — programs are referenced as `"Fat Loss (FL)"`, `"Muscle Gain (MG)"`, `"Beginner (BG)"` instead of short codes
-- Simplified program data model — each program only stores its calorie `factor`
-- Cleaner web interface without gym capacity metrics
-
-**Removed in v2.1.2 (compared to v2.0.1):**
-
-- Short program code keys (`FL`, `MG`, `BG`) replaced by descriptive names
-- `GYM_METRICS` dictionary and its display on the index page
-- `program_name` field from client registration response (redundant with descriptive keys)
+- Support for comprehensive workout and exercise logging (`/workouts`).
+- Advanced body metrics tracking including bodyfat and waist measurements (`/metrics`).
+- BMI & risk calculator endpoint (`/bmi`).
+- Schema expansion to support client height, target weight, and target adherence.
+- Dynamic web interface displaying client goals and program details.
 
 ---
 
@@ -117,14 +109,14 @@ Containerize the application using Docker to ensure a consistent environment acr
 1. **Build the Docker Image:**
 
    ```bash
-   docker build -t aceest-fitness-app:2.2.1 .
+   docker build -t aceest-fitness-app:3.0.1 .
    ```
 
 2. **Run the Container (with Persistence):**
    To ensure your client data persists after stopping the container, mount a local directory to `/app/data`:
 
    ```bash
-   docker run -d -p 5000:5000 --name aceest -v <your-host-path>:/app/data aceest-fitness-app:2.2.1
+   docker run -d -p 5000:5000 --name aceest -v <your-host-path>:/app/data aceest-fitness-app:3.0.1
    ```
 
 3. **Stop the Container:**
@@ -137,7 +129,7 @@ Containerize the application using Docker to ensure a consistent environment acr
 
 ## Testing
 
-The repository uses `pytest` for unit and integration testing. The test suite covers calorie calculations, program lookups, input validation, SQLite persistence, progress tracking, and API endpoint behavior.
+The repository uses `pytest` for unit and integration testing. The test suite covers calorie calculations, program lookups, input validation, SQLite persistence, BMI, workout tracking, progress monitoring, and API endpoint behavior.
 
 **Run tests locally:**
 
@@ -148,7 +140,7 @@ pytest tests/ -v
 **Run tests inside the Docker container:**
 
 ```bash
-docker run --rm aceest-fitness-app:2.2.1 pytest tests/ -v
+docker run --rm aceest-fitness-app:3.0.1 pytest tests/ -v
 ```
 
 ---
@@ -178,7 +170,7 @@ Jenkins serves as an independent build server, acting as a secondary validation 
 3. Execute shell steps to build and validate:
    ```bash
    pip install -r requirements.txt
-   docker build -t aceest-fitness-app:2.2.1 .
+   docker build -t aceest-fitness-app:3.0.1 .
    ```
 
 ---
@@ -187,17 +179,23 @@ Jenkins serves as an independent build server, acting as a secondary validation 
 
 The service provides a simple REST API to interact with the gym's database.
 
-| Method | Endpoint           | Description                                                    | Example Payload/Query                                                     |
-| ------ | ------------------ | -------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| `GET`  | `/`                | Web interface listing gym programs and client list             | N/A                                                                       |
-| `GET`  | `/programs`        | Returns all available fitness programs as JSON                 | N/A                                                                       |
-| `POST` | `/client`          | Register or update a client with a program                     | `{"name": "Ravi", "program": "Fat Loss (FL)", "age": 30, "weight": 75}`  |
-| `GET`  | `/client/<name>`   | Load a client profile by name                                  | `/client/Ravi`                                                            |
-| `GET`  | `/clients`         | Returns the full client list as JSON                           | N/A                                                                       |
-| `POST` | `/progress`        | Save weekly adherence for a client                             | `{"client_name": "Ravi", "adherence": 85}`                                |
-| `GET`  | `/progress/<name>` | Returns all progress entries for a client                      | `/progress/Ravi`                                                          |
-| `GET`  | `/progress/chart/<name>`| Download a generated PNG progress chart for a client   | `/progress/chart/Ravi`                                                    |
-| `GET`  | `/calories`        | Calculate estimated daily calories based on weight and program | `?weight=80&program=Muscle Gain (MG)`                                     |
+| Method | Endpoint                 | Description                                                    | Example Payload/Query                                                               |
+| ------ | ------------------------ | -------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `GET`  | `/`                      | Web interface listing gym programs and client list             | N/A                                                                                 |
+| `GET`  | `/programs`              | Returns all available fitness programs as JSON                 | N/A                                                                                 |
+| `POST` | `/client`                | Register or update a client with a program                     | `{"name": "Ravi", "program": "Fat Loss (FL) – 3 day", "height": 175, "weight": 75}` |
+| `GET`  | `/client/<name>`         | Load a client profile by name                                  | `/client/Ravi`                                                                      |
+| `GET`  | `/clients`               | Returns the full client list as JSON                           | N/A                                                                                 |
+| `POST` | `/workouts`              | Log a workout session & exercises                              | `{"client_name": "Ravi", "workout_type": "Strength", "duration_min": 60}`           |
+| `GET`  | `/workouts/<name>`       | Retrieve workout history for a client                          | `/workouts/Ravi`                                                                    |
+| `POST` | `/metrics`               | Save body metrics (weight, bodyfat, etc)                       | `{"client_name": "Ravi", "weight": 74, "bodyfat": 14.5}`                            |
+| `GET`  | `/metrics/<name>`        | Retrieve recorded body metrics history                         | `/metrics/Ravi`                                                                     |
+| `GET`  | `/metrics/chart/<name>`  | Download a generated PNG weight trend chart                    | `/metrics/chart/Ravi`                                                               |
+| `GET`  | `/bmi`                   | Evaluate BMI metrics and health categories                     | `?height=180&weight=80`                                                             |
+| `POST` | `/progress`              | Save weekly adherence for a client                             | `{"client_name": "Ravi", "adherence": 85}`                                          |
+| `GET`  | `/progress/<name>`       | Returns all progress entries for a client                      | `/progress/Ravi`                                                                    |
+| `GET`  | `/progress/chart/<name>` | Download a generated PNG adherence progress chart              | `/progress/chart/Ravi`                                                              |
+| `GET`  | `/calories`              | Calculate estimated daily calories based on weight and program | `?weight=80&program=Muscle Gain (MG) – PPL`                                         |
 
 ---
 
