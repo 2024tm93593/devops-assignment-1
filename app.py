@@ -52,7 +52,7 @@ def init_db():
     
     cur.execute("PRAGMA table_info(clients)")
     cols = [row[1] for row in cur.fetchall()]
-    required = {"id", "name", "age", "height", "weight", "program", "calories", "target_weight", "target_adherence", "membership_expiry"}
+    required = {"id", "name", "age", "height", "weight", "program", "calories", "target_weight", "target_adherence", "membership_status", "membership_end"}
     if not required.issubset(set(cols)):
         cur.execute("DROP TABLE IF EXISTS clients")
 
@@ -67,7 +67,8 @@ def init_db():
             calories INTEGER,
             target_weight REAL,
             target_adherence INTEGER,
-            membership_expiry TEXT
+            membership_status TEXT,
+            membership_end TEXT
         )
     """)
     cur.execute("""
@@ -153,7 +154,7 @@ INDEX_HTML = """
     </style>
 </head>
 <body>
-    <header><h1>ACEest Functional Fitness System v3.1.2</h1></header>
+    <header><h1>ACEest Functional Fitness System v3.2.4</h1></header>
     <main>
         <h2>Available Programs</h2>
         <div class="programs">
@@ -168,7 +169,7 @@ INDEX_HTML = """
         {% if clients %}
         <h2>Client List</h2>
         <table>
-            <tr><th>Name</th><th>Age</th><th>Height</th><th>Weight</th><th>Program</th><th>Calories</th><th>Target Wt</th><th>Target Adh</th><th>Membership Expiry</th></tr>
+            <tr><th>Name</th><th>Age</th><th>Height</th><th>Weight</th><th>Program</th><th>Calories</th><th>Target Wt</th><th>Target Adh</th><th>Membership Status</th><th>Membership End</th></tr>
             {% for c in clients %}
             <tr>
                 <td>{{ c.name }}</td>
@@ -179,7 +180,8 @@ INDEX_HTML = """
                 <td>{{ c.calories or '-' }} kcal/day</td>
                 <td>{{ c.target_weight or '-' }} kg</td>
                 <td>{{ c.target_adherence or '-' }}%</td>
-                <td>{{ c.membership_expiry or '-' }}</td>
+                <td>{{ c.membership_status or '-' }}</td>
+                <td>{{ c.membership_end or '-' }}</td>
             </tr>
             {% endfor %}
         </table>
@@ -237,7 +239,8 @@ def register_client():
     target_weight = data.get("target_weight")
     target_adherence = data.get("target_adherence")
     program_key = data.get("program", "").strip()
-    membership_expiry = data.get("membership_expiry", "").strip()
+    membership_status = data.get("membership_status", "Active").strip()
+    membership_end = data.get("membership_end", "").strip()
 
     if not name:
         return jsonify({"error": "name is required"}), 400
@@ -250,9 +253,9 @@ def register_client():
 
     conn = get_db()
     conn.execute("""
-        INSERT OR REPLACE INTO clients (name, age, height, weight, program, calories, target_weight, target_adherence, membership_expiry)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (name, age, height, weight, program_key, calories, target_weight, target_adherence, membership_expiry))
+        INSERT OR REPLACE INTO clients (name, age, height, weight, program, calories, target_weight, target_adherence, membership_status, membership_end)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (name, age, height, weight, program_key, calories, target_weight, target_adherence, membership_status, membership_end))
     conn.commit()
     conn.close()
 
@@ -265,7 +268,8 @@ def register_client():
         "calories": calories,
         "target_weight": target_weight,
         "target_adherence": target_adherence,
-        "membership_expiry": membership_expiry,
+        "membership_status": membership_status,
+        "membership_end": membership_end,
     }), 201
 
 
@@ -288,7 +292,24 @@ def load_client(name):
         "calories": row["calories"],
         "target_weight": row["target_weight"],
         "target_adherence": row["target_adherence"],
-        "membership_expiry": row["membership_expiry"],
+        "membership_status": row["membership_status"],
+        "membership_end": row["membership_end"],
+    })
+
+
+@app.route("/membership/<client_name>")
+def check_membership(client_name):
+    conn = get_db()
+    row = conn.execute("SELECT membership_status, membership_end FROM clients WHERE name=?", (client_name,)).fetchone()
+    conn.close()
+
+    if not row:
+        return jsonify({"error": f"client '{client_name}' not found"}), 404
+
+    return jsonify({
+        "client_name": client_name,
+        "membership_status": row["membership_status"],
+        "membership_end": row["membership_end"],
     })
 
 
@@ -627,7 +648,8 @@ def export_pdf(client_name):
     pdf.cell(0, 10, f"Height: {row['height'] or '-'} cm", ln=True)
     pdf.cell(0, 10, f"Weight: {row['weight'] or '-'} kg", ln=True)
     pdf.cell(0, 10, f"Program: {row['program']}", ln=True)
-    pdf.cell(0, 10, f"Membership Expiry: {row['membership_expiry'] or '-'}", ln=True)
+    pdf.cell(0, 10, f"Membership Status: {row['membership_status'] or '-'}", ln=True)
+    pdf.cell(0, 10, f"Membership End: {row['membership_end'] or '-'}", ln=True)
     
     pdf_bytes = pdf.output(dest='S').encode('latin1')
     
