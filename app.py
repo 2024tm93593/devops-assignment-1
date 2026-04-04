@@ -647,7 +647,8 @@ def export_pdf(client_name):
     pdf.cell(0, 10, f"Age: {row['age'] or '-'}", ln=True)
     pdf.cell(0, 10, f"Height: {row['height'] or '-'} cm", ln=True)
     pdf.cell(0, 10, f"Weight: {row['weight'] or '-'} kg", ln=True)
-    pdf.cell(0, 10, f"Program: {row['program']}", ln=True)
+    program_name = str(row['program']).replace('–', '-') if row['program'] else ''
+    pdf.cell(0, 10, f"Program: {program_name}", ln=True)
     pdf.cell(0, 10, f"Membership Status: {row['membership_status'] or '-'}", ln=True)
     pdf.cell(0, 10, f"Membership End: {row['membership_end'] or '-'}", ln=True)
     
