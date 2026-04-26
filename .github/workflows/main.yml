@@ -34,13 +34,10 @@ jobs:
         run: |
           docker build -t aceest-gym:${{ github.sha }} -t aceest-gym:latest .
 
-      - name: Stage 3 - Automated Testing inside Docker
-        # We run pytest inside the container we just built to ensure the containerized environment is stable
+      - name: Stage 3 - Automated Testing
         run: |
-          docker run --rm aceest-gym:${{ github.sha }} pytest tests/ -v --cov=. --cov-report=xml
-          # Copy coverage report out of the container for SonarCloud to consume
-          docker run --rm -v ${{ github.workspace }}:/output aceest-gym:${{ github.sha }} \
-            sh -c "pytest tests/ -v --cov=. --cov-report=xml && cp coverage.xml /output/coverage.xml" || true
+          pip install pytest-cov
+          pytest tests/ -v --cov=. --cov-report=xml
 
       - name: Stage 4 - SonarCloud Code Quality Analysis
         uses: SonarSource/sonarqube-scan-action@v5

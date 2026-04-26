@@ -51,7 +51,6 @@ pipeline {
             steps {
                 sh '''
                     docker build -t $DOCKER_IMAGE .
-                    docker run --rm -e PYTHONPATH=. $DOCKER_IMAGE pytest tests/ -v
                 '''
             }
         }
