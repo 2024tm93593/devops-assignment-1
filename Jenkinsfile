@@ -31,17 +31,19 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('SonarCloud') {
-                    sh '''
-                        sonar-scanner \
-                            -Dsonar.projectKey=2024tm93593_devops-assignment-1 \
-                            -Dsonar.projectName="2024tm93593_devops-assignment-1" \
-                            -Dsonar.sources=. \
-                            -Dsonar.exclusions=**/venv/**,**/__pycache__/**,**/*.pyc \
-                            -Dsonar.tests=tests \
-                            -Dsonar.python.version=3.11 \
-                            -Dsonar.python.coverage.reportPaths=coverage.xml \
-                            -Dsonar.host.url=https://sonarcloud.io
-                    '''
+                    withEnv(["PATH+SONAR=${tool 'SonarScanner'}/bin"]) {
+                        sh '''
+                            sonar-scanner \
+                                -Dsonar.projectKey=2024tm93593_devops-assignment-1 \
+                                -Dsonar.projectName="2024tm93593_devops-assignment-1" \
+                                -Dsonar.sources=. \
+                                -Dsonar.exclusions=**/venv/**,**/__pycache__/**,**/*.pyc \
+                                -Dsonar.tests=tests \
+                                -Dsonar.python.version=3.11 \
+                                -Dsonar.python.coverage.reportPaths=coverage.xml \
+                                -Dsonar.host.url=https://sonarcloud.io
+                        '''
+                    }
                 }
             }
         }
