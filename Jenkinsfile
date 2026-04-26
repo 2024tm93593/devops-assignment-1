@@ -37,7 +37,7 @@ pipeline {
                                 -Dsonar.projectKey=2024tm93593_devops-assignment-1 \
                                 -Dsonar.projectName="2024tm93593_devops-assignment-1" \
                                 -Dsonar.sources=. \
-                                -Dsonar.exclusions=**/venv/**,**/__pycache__/**,**/*.pyc \
+                                -Dsonar.exclusions=**/venv/**,**/__pycache__/**,**/*.pyc,**/tests/** \
                                 -Dsonar.tests=tests \
                                 -Dsonar.python.version=3.11 \
                                 -Dsonar.python.coverage.reportPaths=coverage.xml \
