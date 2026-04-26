@@ -36,11 +36,18 @@ jobs:
 
       - name: Stage 3 - Automated Testing
         run: |
-          pip install pytest-cov
-          pytest tests/ -v --cov=. --cov-report=xml
+          PYTHONPATH=. pytest tests/ -v --cov=. --cov-report=xml
 
       - name: Stage 4 - SonarCloud Code Quality Analysis
         uses: SonarSource/sonarqube-scan-action@v5
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: https://sonarcloud.io
+
+      - name: Stage 5 - Push to DockerHub
+        run: |
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+          docker tag aceest-gym:${{ github.sha }} chetan56881/aceest-fitness-app:gha-${{ github.run_number }}
+          docker tag aceest-gym:${{ github.sha }} chetan56881/aceest-fitness-app:latest-gha
+          docker push --all-tags chetan56881/aceest-fitness-app
+          docker logout
