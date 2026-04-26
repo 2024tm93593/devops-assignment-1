@@ -47,14 +47,7 @@ pipeline {
                 }
             }
         }
-        stage('Docker Phase') {
-            steps {
-                sh '''
-                    DOCKER_BUILDKIT=1 docker build --progress=plain -t $DOCKER_IMAGE .
-                '''
-            }
-        }
-        stage('Push to DockerHub') {
+        stage('Build & Push to DockerHub') {
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: 'dockerhub-credentials',
@@ -63,9 +56,10 @@ pipeline {
                 )]) {
                     sh '''
                         echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                        docker tag $DOCKER_IMAGE $DOCKERHUB_IMAGE:${IMAGE_TAG}
-                        docker tag $DOCKER_IMAGE $DOCKERHUB_IMAGE:latest
-                        DOCKER_BUILDKIT=1 docker push --progress=plain --all-tags $DOCKERHUB_IMAGE
+                        docker buildx build --progress=plain --push \
+                            -t $DOCKERHUB_IMAGE:${IMAGE_TAG} \
+                            -t $DOCKERHUB_IMAGE:latest \
+                            .
                         docker logout
                     '''
                 }
