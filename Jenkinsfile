@@ -50,7 +50,7 @@ pipeline {
         stage('Docker Phase') {
             steps {
                 sh '''
-                    docker build -t $DOCKER_IMAGE .
+                    DOCKER_BUILDKIT=1 docker build -t $DOCKER_IMAGE .
                 '''
             }
         }
@@ -65,8 +65,7 @@ pipeline {
                         echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
                         docker tag $DOCKER_IMAGE $DOCKERHUB_IMAGE:${IMAGE_TAG}
                         docker tag $DOCKER_IMAGE $DOCKERHUB_IMAGE:latest
-                        docker push $DOCKERHUB_IMAGE:${IMAGE_TAG}
-                        docker push $DOCKERHUB_IMAGE:latest
+                        DOCKER_BUILDKIT=1 docker push --all-tags $DOCKERHUB_IMAGE
                         docker logout
                     '''
                 }
