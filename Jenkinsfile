@@ -50,7 +50,7 @@ pipeline {
         stage('Docker Phase') {
             steps {
                 sh '''
-                    DOCKER_BUILDKIT=1 docker build -t $DOCKER_IMAGE .
+                    DOCKER_BUILDKIT=1 docker build --progress=plain -t $DOCKER_IMAGE .
                 '''
             }
         }
