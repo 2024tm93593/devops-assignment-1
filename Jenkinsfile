@@ -65,6 +65,24 @@ pipeline {
                 }
             }
         }
+        stage('Deploy to GCP VM') {
+            steps {
+                withCredentials([
+                    sshUserPrivateKey(
+                        credentialsId: 'gcp-vm-ssh-key',
+                        keyFileVariable: 'SSH_KEY'
+                    ),
+                    string(credentialsId: 'GCP_VM_IP', variable: 'VM_IP'),
+                    string(credentialsId: 'GCP_VM_USER', variable: 'VM_USER')
+                ]) {
+                    sh '''
+                        chmod 600 $SSH_KEY
+                        scp -i $SSH_KEY -o StrictHostKeyChecking=no k8s/deployment.yaml $VM_USER@$VM_IP:~/deployment.yaml
+                        ssh -i $SSH_KEY -o StrictHostKeyChecking=no $VM_USER@$VM_IP "kubectl apply -f ~/deployment.yaml"
+                    '''
+                }
+            }
+        }
     }
     post {
         always {
