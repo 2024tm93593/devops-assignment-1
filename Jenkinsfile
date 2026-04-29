@@ -85,7 +85,6 @@ pipeline {
                                 chmod 600 $SSH_KEY
                                 ssh -i $SSH_KEY -o StrictHostKeyChecking=no $VM_USER@$VM_IP "mkdir -p ~/blue-green"
                                 scp -i $SSH_KEY -o StrictHostKeyChecking=no \
-                                    k8s/blue-green/namespaces.yaml \
                                     k8s/blue-green/blue-deployment.yaml \
                                     k8s/blue-green/green-deployment.yaml \
                                     k8s/blue-green/blue-service.yaml \
