@@ -130,13 +130,84 @@ pipeline {
                                     kubectl get configmap blue-green-state -n default -o yaml
                                 "
                             '''
-                        } else {
-                            echo "Strategy '${params.DEPLOY_STRATEGY}' selected — coming soon. Falling back to standard deploy."
+                        } else if (params.DEPLOY_STRATEGY == 'canary') {
                             sh '''
                                 chmod 600 $SSH_KEY
-                                scp -i $SSH_KEY -o StrictHostKeyChecking=no k8s/deployment.yaml $VM_USER@$VM_IP:~/deployment.yaml
-                                ssh -i $SSH_KEY -o StrictHostKeyChecking=no $VM_USER@$VM_IP "kubectl apply -f ~/deployment.yaml"
+                                ssh -i $SSH_KEY -o StrictHostKeyChecking=no $VM_USER@$VM_IP "mkdir -p ~/canary"
+                                scp -i $SSH_KEY -o StrictHostKeyChecking=no \
+                                    k8s/canary/stable-deployment.yaml \
+                                    k8s/canary/canary-deployment.yaml \
+                                    k8s/canary/stable-service.yaml \
+                                    k8s/canary/canary-service.yaml \
+                                    k8s/canary/state-configmap.yaml \
+                                    k8s/canary/canary-enable.sh \
+                                    k8s/canary/promote.sh \
+                                    k8s/canary/rollback.sh \
+                                    $VM_USER@$VM_IP:~/canary/
+                                ssh -i $SSH_KEY -o StrictHostKeyChecking=no $VM_USER@$VM_IP "
+                                    set -e
+                                    chmod +x ~/canary/canary-enable.sh ~/canary/promote.sh ~/canary/rollback.sh
+
+                                    kubectl get namespace stable &>/dev/null || kubectl create namespace stable
+                                    kubectl get namespace canary &>/dev/null || kubectl create namespace canary
+                                    kubectl get configmap canary-state -n default &>/dev/null || kubectl apply -f ~/canary/state-configmap.yaml
+                                    kubectl get svc aceest-fitness-app-router -n default &>/dev/null || kubectl apply -f ~/blue-green/router-service.yaml
+                                    kubectl get svc aceest-fitness-app -n stable &>/dev/null || kubectl apply -f ~/canary/stable-service.yaml
+                                    kubectl get svc aceest-fitness-app -n canary &>/dev/null || kubectl apply -f ~/canary/canary-service.yaml
+
+                                    echo '================================================'
+                                    echo '  CANARY DEPLOY'
+                                    echo '  Deploying ${DOCKERHUB_IMAGE}:${IMAGE_TAG} to canary'
+                                    echo '================================================'
+
+                                    kubectl apply -f ~/canary/stable-deployment.yaml
+                                    kubectl apply -f ~/canary/canary-deployment.yaml
+                                    kubectl set image deployment/aceest-fitness-app -n canary aceest-fitness-app=${DOCKERHUB_IMAGE}:${IMAGE_TAG}
+                                    kubectl rollout status deployment/aceest-fitness-app -n canary --timeout=120s
+
+                                    echo '--- Pre-enable: pods in stable ---'
+                                    kubectl get pods -n stable -l app=aceest-fitness-app
+                                    echo '--- Pre-enable: pods in canary ---'
+                                    kubectl get pods -n canary -l app=aceest-fitness-app
+
+                                    ~/canary/canary-enable.sh
+
+                                    echo '--- Canary state ---'
+                                    kubectl get configmap canary-state -n default -o yaml
+                                "
                             '''
+                        } else if (params.DEPLOY_STRATEGY == 'rolling') {
+                            sh '''
+                                chmod 600 $SSH_KEY
+                                scp -i $SSH_KEY -o StrictHostKeyChecking=no \
+                                    k8s/deployment.yaml \
+                                    $VM_USER@$VM_IP:~/deployment.yaml
+                                ssh -i $SSH_KEY -o StrictHostKeyChecking=no $VM_USER@$VM_IP "
+                                    set -e
+
+                                    echo '================================================'
+                                    echo '  ROLLING UPDATE'
+                                    echo '  Deploying ${DOCKERHUB_IMAGE}:${IMAGE_TAG}'
+                                    echo '================================================'
+
+                                    kubectl apply -f ~/deployment.yaml
+                                    kubectl set image deployment/aceest-fitness-app aceest-fitness-app=${DOCKERHUB_IMAGE}:${IMAGE_TAG} -n default
+                                    kubectl rollout status deployment/aceest-fitness-app -n default --timeout=120s
+
+                                    echo '--- Rolling update history ---'
+                                    kubectl rollout history deployment/aceest-fitness-app -n default
+
+                                    echo '--- Pod state after rollout ---'
+                                    kubectl get pods -n default -l app=aceest-fitness-app -o wide
+
+                                    echo '--- Deployment image ---'
+                                    kubectl get deployment aceest-fitness-app -n default \
+                                        -o jsonpath='{.spec.template.spec.containers[0].image}'
+                                    echo ''
+                                "
+                            '''
+                        } else {
+                            echo "Strategy '${params.DEPLOY_STRATEGY}' selected — coming soon."
                         }
                     }
                 }
@@ -163,6 +234,43 @@ pipeline {
                                 kubectl get pods -n green -l app=aceest-fitness-app --ignore-not-found
                                 echo '--- Rollback: router endpointslice ---'
                                 kubectl get endpointslice aceest-fitness-app-router -n default --ignore-not-found
+                            "
+                        '''
+                    }
+                } else if (params.DEPLOY_STRATEGY == 'canary') {
+                    withCredentials([
+                        sshUserPrivateKey(credentialsId: 'gcp-vm-ssh-key', keyFileVariable: 'SSH_KEY'),
+                        string(credentialsId: 'GCP_VM_IP', variable: 'VM_IP'),
+                        string(credentialsId: 'GCP_VM_USER', variable: 'VM_USER')
+                    ]) {
+                        sh '''
+                            chmod 600 $SSH_KEY
+                            ssh -i $SSH_KEY -o StrictHostKeyChecking=no $VM_USER@$VM_IP "
+                                chmod +x ~/canary/rollback.sh
+                                ~/canary/rollback.sh || true
+                                echo '--- Rollback: pods in stable ---'
+                                kubectl get pods -n stable -l app=aceest-fitness-app --ignore-not-found
+                                echo '--- Rollback: router endpointslice ---'
+                                kubectl get endpointslice aceest-fitness-app-router -n default --ignore-not-found
+                            "
+                        '''
+                    }
+                } else if (params.DEPLOY_STRATEGY == 'rolling') {
+                    withCredentials([
+                        sshUserPrivateKey(credentialsId: 'gcp-vm-ssh-key', keyFileVariable: 'SSH_KEY'),
+                        string(credentialsId: 'GCP_VM_IP', variable: 'VM_IP'),
+                        string(credentialsId: 'GCP_VM_USER', variable: 'VM_USER')
+                    ]) {
+                        sh '''
+                            chmod 600 $SSH_KEY
+                            ssh -i $SSH_KEY -o StrictHostKeyChecking=no $VM_USER@$VM_IP "
+                                kubectl rollout undo deployment/aceest-fitness-app -n default || true
+                                echo '--- Rollback: pod state ---'
+                                kubectl get pods -n default -l app=aceest-fitness-app --ignore-not-found
+                                echo '--- Rollback: current image ---'
+                                kubectl get deployment aceest-fitness-app -n default \
+                                    -o jsonpath='{.spec.template.spec.containers[0].image}' || true
+                                echo ''
                             "
                         '''
                     }

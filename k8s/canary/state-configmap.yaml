@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: canary-state
+  namespace: default
+data:
+  status: "stable-only"
+  stable-image: "chetan56881/aceest-fitness-app:latest"
+  canary-image: "none"
+  last-updated: "never"
