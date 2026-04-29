@@ -206,8 +206,145 @@ pipeline {
                                     echo ''
                                 "
                             '''
-                        } else {
-                            echo "Strategy '${params.DEPLOY_STRATEGY}' selected — coming soon."
+                        } else if (params.DEPLOY_STRATEGY == 'shadow') {
+                            sh '''
+                                chmod 600 $SSH_KEY
+                                ssh -i $SSH_KEY -o StrictHostKeyChecking=no $VM_USER@$VM_IP "mkdir -p ~/shadow"
+                                scp -i $SSH_KEY -o StrictHostKeyChecking=no \
+                                    k8s/shadow/prod-deployment.yaml \
+                                    k8s/shadow/shadow-deployment.yaml \
+                                    k8s/shadow/prod-service.yaml \
+                                    k8s/shadow/shadow-service.yaml \
+                                    k8s/shadow/nginx-configmap.yaml \
+                                    k8s/shadow/nginx-deployment.yaml \
+                                    k8s/shadow/nginx-service.yaml \
+                                    k8s/shadow/rollback.sh \
+                                    $VM_USER@$VM_IP:~/shadow/
+                                ssh -i $SSH_KEY -o StrictHostKeyChecking=no $VM_USER@$VM_IP "
+                                    set -e
+                                    chmod +x ~/shadow/rollback.sh
+
+                                    kubectl get namespace prod &>/dev/null || kubectl create namespace prod
+                                    kubectl get namespace shadow &>/dev/null || kubectl create namespace shadow
+                                    kubectl get svc aceest-fitness-app-router -n default &>/dev/null || kubectl apply -f ~/blue-green/router-service.yaml
+                                    kubectl get svc aceest-fitness-app -n prod &>/dev/null || kubectl apply -f ~/shadow/prod-service.yaml
+                                    kubectl get svc aceest-fitness-app -n shadow &>/dev/null || kubectl apply -f ~/shadow/shadow-service.yaml
+
+                                    echo '================================================'
+                                    echo '  SHADOW DEPLOY'
+                                    echo '  Prod: ${DOCKERHUB_IMAGE}:latest'
+                                    echo '  Shadow: ${DOCKERHUB_IMAGE}:${IMAGE_TAG} (new version under test)'
+                                    echo '================================================'
+
+                                    kubectl apply -f ~/shadow/prod-deployment.yaml
+                                    kubectl apply -f ~/shadow/shadow-deployment.yaml
+                                    kubectl set image deployment/aceest-fitness-app -n shadow aceest-fitness-app=${DOCKERHUB_IMAGE}:${IMAGE_TAG}
+                                    kubectl rollout status deployment/aceest-fitness-app -n prod --timeout=120s
+                                    kubectl rollout status deployment/aceest-fitness-app -n shadow --timeout=120s
+
+                                    kubectl apply -f ~/shadow/nginx-configmap.yaml
+                                    kubectl apply -f ~/shadow/nginx-deployment.yaml
+                                    kubectl apply -f ~/shadow/nginx-service.yaml
+                                    kubectl rollout status deployment/aceest-nginx-proxy -n default --timeout=60s
+
+                                    NGINX_IP=\\$(kubectl get svc aceest-nginx-proxy -n default -o jsonpath='{.spec.clusterIP}')
+                                    kubectl apply -f - <<EOF
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: aceest-fitness-app-router
+  namespace: default
+  labels:
+    kubernetes.io/service-name: aceest-fitness-app-router
+addressType: IPv4
+endpoints:
+  - addresses:
+      - \\\"\\$NGINX_IP\\\"
+ports:
+  - port: 5000
+    protocol: TCP
+EOF
+
+                                    echo '--- Prod pods ---'
+                                    kubectl get pods -n prod -l app=aceest-fitness-app
+                                    echo '--- Shadow pods (mirrored traffic, responses dropped) ---'
+                                    kubectl get pods -n shadow -l app=aceest-fitness-app
+                                    echo '--- nginx mirror proxy ---'
+                                    kubectl get pods -n default -l app=aceest-nginx-proxy
+                                    echo '--- Router EndpointSlice --> nginx proxy ---'
+                                    kubectl get endpointslice aceest-fitness-app-router -n default -o wide
+                                "
+                            '''
+                        } else if (params.DEPLOY_STRATEGY == 'ab-testing') {
+                            sh '''
+                                chmod 600 $SSH_KEY
+                                ssh -i $SSH_KEY -o StrictHostKeyChecking=no $VM_USER@$VM_IP "mkdir -p ~/ab-testing"
+                                scp -i $SSH_KEY -o StrictHostKeyChecking=no \
+                                    k8s/ab-testing/a-deployment.yaml \
+                                    k8s/ab-testing/b-deployment.yaml \
+                                    k8s/ab-testing/a-service.yaml \
+                                    k8s/ab-testing/b-service.yaml \
+                                    k8s/ab-testing/nginx-configmap.yaml \
+                                    k8s/ab-testing/nginx-deployment.yaml \
+                                    k8s/ab-testing/nginx-service.yaml \
+                                    k8s/ab-testing/rollback.sh \
+                                    $VM_USER@$VM_IP:~/ab-testing/
+                                ssh -i $SSH_KEY -o StrictHostKeyChecking=no $VM_USER@$VM_IP "
+                                    set -e
+                                    chmod +x ~/ab-testing/rollback.sh
+
+                                    kubectl get namespace a-site &>/dev/null || kubectl create namespace a-site
+                                    kubectl get namespace b-site &>/dev/null || kubectl create namespace b-site
+                                    kubectl get svc aceest-fitness-app-router -n default &>/dev/null || kubectl apply -f ~/blue-green/router-service.yaml
+                                    kubectl get svc aceest-fitness-app -n a-site &>/dev/null || kubectl apply -f ~/ab-testing/a-service.yaml
+                                    kubectl get svc aceest-fitness-app -n b-site &>/dev/null || kubectl apply -f ~/ab-testing/b-service.yaml
+
+                                    echo '================================================'
+                                    echo '  A/B TESTING DEPLOY'
+                                    echo '  Variant A: ${DOCKERHUB_IMAGE}:latest  (default)'
+                                    echo '  Variant B: ${DOCKERHUB_IMAGE}:${IMAGE_TAG}  (new)'
+                                    echo '  Route to B: cookie ab_variant=b  or  header X-AB-Variant: b'
+                                    echo '================================================'
+
+                                    kubectl apply -f ~/ab-testing/a-deployment.yaml
+                                    kubectl apply -f ~/ab-testing/b-deployment.yaml
+                                    kubectl set image deployment/aceest-fitness-app -n b-site aceest-fitness-app=${DOCKERHUB_IMAGE}:${IMAGE_TAG}
+                                    kubectl rollout status deployment/aceest-fitness-app -n a-site --timeout=120s
+                                    kubectl rollout status deployment/aceest-fitness-app -n b-site --timeout=120s
+
+                                    kubectl apply -f ~/ab-testing/nginx-configmap.yaml
+                                    kubectl apply -f ~/ab-testing/nginx-deployment.yaml
+                                    kubectl apply -f ~/ab-testing/nginx-service.yaml
+                                    kubectl rollout status deployment/aceest-nginx-proxy -n default --timeout=60s
+
+                                    NGINX_IP=\\$(kubectl get svc aceest-nginx-proxy -n default -o jsonpath='{.spec.clusterIP}')
+                                    kubectl apply -f - <<EOF
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: aceest-fitness-app-router
+  namespace: default
+  labels:
+    kubernetes.io/service-name: aceest-fitness-app-router
+addressType: IPv4
+endpoints:
+  - addresses:
+      - \\\"\\$NGINX_IP\\\"
+ports:
+  - port: 5000
+    protocol: TCP
+EOF
+
+                                    echo '--- Variant A pods (a-site) ---'
+                                    kubectl get pods -n a-site -l app=aceest-fitness-app
+                                    echo '--- Variant B pods (b-site) ---'
+                                    kubectl get pods -n b-site -l app=aceest-fitness-app
+                                    echo '--- nginx A/B proxy ---'
+                                    kubectl get pods -n default -l app=aceest-nginx-proxy
+                                    echo '--- Router EndpointSlice --> nginx proxy ---'
+                                    kubectl get endpointslice aceest-fitness-app-router -n default -o wide
+                                "
+                            '''
                         }
                     }
                 }
@@ -271,6 +408,34 @@ pipeline {
                                 kubectl get deployment aceest-fitness-app -n default \
                                     -o jsonpath='{.spec.template.spec.containers[0].image}' || true
                                 echo ''
+                            "
+                        '''
+                    }
+                } else if (params.DEPLOY_STRATEGY == 'shadow') {
+                    withCredentials([
+                        sshUserPrivateKey(credentialsId: 'gcp-vm-ssh-key', keyFileVariable: 'SSH_KEY'),
+                        string(credentialsId: 'GCP_VM_IP', variable: 'VM_IP'),
+                        string(credentialsId: 'GCP_VM_USER', variable: 'VM_USER')
+                    ]) {
+                        sh '''
+                            chmod 600 $SSH_KEY
+                            ssh -i $SSH_KEY -o StrictHostKeyChecking=no $VM_USER@$VM_IP "
+                                chmod +x ~/shadow/rollback.sh
+                                ~/shadow/rollback.sh || true
+                            "
+                        '''
+                    }
+                } else if (params.DEPLOY_STRATEGY == 'ab-testing') {
+                    withCredentials([
+                        sshUserPrivateKey(credentialsId: 'gcp-vm-ssh-key', keyFileVariable: 'SSH_KEY'),
+                        string(credentialsId: 'GCP_VM_IP', variable: 'VM_IP'),
+                        string(credentialsId: 'GCP_VM_USER', variable: 'VM_USER')
+                    ]) {
+                        sh '''
+                            chmod 600 $SSH_KEY
+                            ssh -i $SSH_KEY -o StrictHostKeyChecking=no $VM_USER@$VM_IP "
+                                chmod +x ~/ab-testing/rollback.sh
+                                ~/ab-testing/rollback.sh || true
                             "
                         '''
                     }
