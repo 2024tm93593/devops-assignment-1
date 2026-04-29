@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aceest-fitness-app
+  namespace: shadow
+  labels:
+    app: aceest-fitness-app
+    track: shadow
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: aceest-fitness-app
+      track: shadow
+  template:
+    metadata:
+      labels:
+        app: aceest-fitness-app
+        track: shadow
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: aceest-fitness-app
+          image: chetan56881/aceest-fitness-app:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5000
+          resources:
+            limits:
+              memory: "256Mi"
+            requests:
+              memory: "128Mi"

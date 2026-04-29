@@ -12,6 +12,7 @@ from fpdf import FPDF
 app = Flask(__name__)
 
 DB_NAME = os.environ.get("ACEEST_DB", "aceest_fitness.db")
+AB_VARIANT = os.environ.get("AB_VARIANT", "A")
 
 # Core data store — translated from ACEest v3.0.1 Tkinter desktop application
 PROGRAMS = {
@@ -154,6 +155,9 @@ INDEX_HTML = """
     </style>
 </head>
 <body>
+    <div style="position:fixed;top:12px;right:16px;background:{{ '#1a73e8' if variant == 'B' else '#2e7d32' }};color:#fff;padding:6px 16px;border-radius:20px;font-weight:bold;font-size:13px;z-index:999;box-shadow:0 2px 6px rgba(0,0,0,0.4);">
+      {{ variant }}-Site
+    </div>
     <header><h1>ACEest Functional Fitness System v3.2.4</h1></header>
     <main>
         <h2>Available Programs</h2>
@@ -202,7 +206,7 @@ def index():
     rows = conn.execute("SELECT * FROM clients").fetchall()
     conn.close()
     client_list = [dict(r) for r in rows]
-    return render_template_string(INDEX_HTML, programs=PROGRAMS, clients=client_list)
+    return render_template_string(INDEX_HTML, programs=PROGRAMS, clients=client_list, variant=AB_VARIANT)
 
 
 @app.route("/programs")
