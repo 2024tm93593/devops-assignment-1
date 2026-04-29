@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aceest-fitness-app
+  namespace: b-site
+  labels:
+    app: aceest-fitness-app
+    variant: b
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: aceest-fitness-app
+      variant: b
+  template:
+    metadata:
+      labels:
+        app: aceest-fitness-app
+        variant: b
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: aceest-fitness-app
+          image: chetan56881/aceest-fitness-app:latest
+          imagePullPolicy: Always
+          env:
+            - name: AB_VARIANT
+              value: "B"
+          ports:
+            - containerPort: 5000
+          resources:
+            limits:
+              memory: "256Mi"
+            requests:
+              memory: "128Mi"
