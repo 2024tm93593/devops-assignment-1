@@ -112,21 +112,21 @@ pipeline {
                                     echo \\\"  BLUE-GREEN DEPLOY: \\$ACTIVE --> \\$TARGET\\\"
                                     echo '================================================'
 
-                                    kubectl set image deployment/aceest-fitness-app -n \\$TARGET aceest-fitness-app=${DOCKERHUB_IMAGE}:${IMAGE_TAG}
                                     kubectl apply -f ~/blue-green/\\${TARGET}-deployment.yaml
+                                    kubectl set image deployment/aceest-fitness-app -n \\$TARGET aceest-fitness-app=${DOCKERHUB_IMAGE}:${IMAGE_TAG}
                                     kubectl rollout status deployment/aceest-fitness-app -n \\$TARGET --timeout=120s
 
                                     echo '--- Pre-switch: pods in blue namespace ---'
                                     kubectl get pods -n blue -l app=aceest-fitness-app
                                     echo '--- Pre-switch: pods in green namespace ---'
                                     kubectl get pods -n green -l app=aceest-fitness-app
-                                    echo '--- Router endpoints (current) ---'
-                                    kubectl get endpoints aceest-fitness-app-router -n default
+                                    echo '--- Router endpointslice (current) ---'
+                                    kubectl get endpointslice aceest-fitness-app-router -n default --ignore-not-found
 
                                     ~/blue-green/switch-traffic.sh \\$TARGET
 
-                                    echo '--- Final router endpoints ---'
-                                    kubectl get endpoints aceest-fitness-app-router -n default
+                                    echo '--- Final router endpointslice ---'
+                                    kubectl get endpointslice aceest-fitness-app-router -n default
                                     kubectl get configmap blue-green-state -n default -o yaml
                                 "
                             '''
@@ -161,8 +161,8 @@ pipeline {
                                 kubectl get pods -n blue -l app=aceest-fitness-app --ignore-not-found
                                 echo '--- Rollback: pods in green ---'
                                 kubectl get pods -n green -l app=aceest-fitness-app --ignore-not-found
-                                echo '--- Rollback: router endpoints ---'
-                                kubectl get endpoints aceest-fitness-app-router -n default --ignore-not-found
+                                echo '--- Rollback: router endpointslice ---'
+                                kubectl get endpointslice aceest-fitness-app-router -n default --ignore-not-found
                             "
                         '''
                     }
