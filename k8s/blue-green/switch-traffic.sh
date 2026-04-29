@@ -23,16 +23,20 @@ if [ -z "$TARGET_IP" ]; then
 fi
 
 kubectl apply -f - <<EOF
-apiVersion: v1
-kind: Endpoints
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
 metadata:
   name: aceest-fitness-app-router
   namespace: default
-subsets:
+  labels:
+    kubernetes.io/service-name: aceest-fitness-app-router
+addressType: IPv4
+endpoints:
   - addresses:
-      - ip: "${TARGET_IP}"
-    ports:
-      - port: 5000
+      - "${TARGET_IP}"
+ports:
+  - port: 5000
+    protocol: TCP
 EOF
 
 kubectl annotate service aceest-fitness-app-router -n default \
@@ -45,7 +49,7 @@ kubectl patch configmap blue-green-state -n default -p \
 
 echo "================================================"
 echo "  TRAFFIC SWITCHED: $PREVIOUS_COLOR --> $TARGET_COLOR"
-echo "  Router Endpoints --> $TARGET_IP (namespace: $TARGET_COLOR)"
+echo "  Router --> $TARGET_IP (namespace: $TARGET_COLOR)"
 echo "================================================"
 echo ""
 echo "--- Pods in blue namespace ---"
@@ -54,8 +58,8 @@ echo ""
 echo "--- Pods in green namespace ---"
 kubectl get pods -n green -l app=aceest-fitness-app
 echo ""
-echo "--- Router Endpoints (default namespace) ---"
-kubectl get endpoints aceest-fitness-app-router -n default
+echo "--- Router EndpointSlice ---"
+kubectl get endpointslice aceest-fitness-app-router -n default
 echo ""
 echo "--- Deployment State ---"
 kubectl get configmap blue-green-state -n default -o jsonpath='{.data}' | tr ',' '\n'
