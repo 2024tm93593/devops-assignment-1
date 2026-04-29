@@ -142,8 +142,9 @@ INDEX_HTML = """
     <title>ACEest Fitness & Gym</title>
     <style>
         body { font-family: Arial, sans-serif; background: #1a1a1a; color: #fff; margin: 0; }
-        header { background: #d4af37; padding: 20px; text-align: center; }
-        header h1 { color: #000; margin: 0; }
+        header { background: {{ '#1a73e8' if variant == 'B' else '#d4af37' }}; padding: 20px; text-align: center; }
+        header h1 { color: {{ '#fff' if variant == 'B' else '#000' }}; margin: 0; }
+        .variant-banner { background: {{ '#1a73e8' if variant == 'B' else '#2e7d32' }}; color: #fff; text-align: center; padding: 6px; font-size: 13px; font-weight: bold; letter-spacing: 1px; }
         main { padding: 30px; }
         .programs { display: flex; gap: 20px; flex-wrap: wrap; }
         .card { background: #2b2b2b; border-radius: 8px; padding: 20px; min-width: 240px; flex: 1; }
@@ -155,10 +156,8 @@ INDEX_HTML = """
     </style>
 </head>
 <body>
-    <div style="position:fixed;top:12px;right:16px;background:{{ '#1a73e8' if variant == 'B' else '#2e7d32' }};color:#fff;padding:6px 16px;border-radius:20px;font-weight:bold;font-size:13px;z-index:999;box-shadow:0 2px 6px rgba(0,0,0,0.4);">
-      {{ variant }}-Site
-    </div>
-    <header><h1>ACEest Functional Fitness System v3.2.4</h1></header>
+    <div class="variant-banner">{{ 'B-SITE — Variant B (New Version Under Test)' if variant == 'B' else 'A-SITE — Variant A (Stable)' }}</div>
+    <header><h1>ACEest Functional Fitness System v3.2.4{{ ' [B]' if variant == 'B' else '' }}</h1></header>
     <main>
         <h2>Available Programs</h2>
         <div class="programs">
