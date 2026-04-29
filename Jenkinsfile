@@ -157,13 +157,13 @@ pipeline {
                             chmod 600 $SSH_KEY
                             ssh -i $SSH_KEY -o StrictHostKeyChecking=no $VM_USER@$VM_IP "
                                 chmod +x ~/blue-green/rollback.sh
-                                ~/blue-green/rollback.sh
+                                ~/blue-green/rollback.sh || true
                                 echo '--- Rollback: pods in blue ---'
-                                kubectl get pods -n blue -l app=aceest-fitness-app
+                                kubectl get pods -n blue -l app=aceest-fitness-app --ignore-not-found
                                 echo '--- Rollback: pods in green ---'
-                                kubectl get pods -n green -l app=aceest-fitness-app
+                                kubectl get pods -n green -l app=aceest-fitness-app --ignore-not-found
                                 echo '--- Rollback: router endpoints ---'
-                                kubectl get endpoints aceest-fitness-app-router -n default
+                                kubectl get endpoints aceest-fitness-app-router -n default --ignore-not-found
                             "
                         '''
                     }
